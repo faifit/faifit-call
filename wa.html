@@ -19,16 +19,24 @@
 <div class="box">
   <div class="t">FAIFIT</div>
   <div class="num" id="num">…</div>
-  <a class="wa" id="btn" href="#">📱 WhatsApp kholein</a>
+  <a class="wa" id="btn" href="#">📱 WhatsApp Business kholein</a>
   <a class="back" href="https://script.google.com/macros/s/AKfycbz_sgskIP3sJ_JQ8aZP0iVcjf1wjVsdeEGhZwE4_w1fa5mV3hZ66g8M-oD5cdnwbEnK4w/exec">← Wapas app par</a>
 </div>
 <script>
-  var n = (new URLSearchParams(location.search).get('n') || '').replace(/\D/g, '');
+  var q = new URLSearchParams(location.search);
+  var n = (q.get('n') || '').replace(/\D/g, '');
+  var t = q.get('t') || '';
   if (n) {
     document.getElementById('num').textContent = '+' + n;
-    var app = 'https://wa.me/' + n;
-    document.getElementById('btn').href = app;
-    setTimeout(function(){ location.href = app; }, 350);
+    var waMe = 'https://wa.me/' + n + (t ? '?text=' + encodeURIComponent(t) : '');
+    var intent = 'intent://send?phone=' + n +
+      (t ? '&text=' + encodeURIComponent(t) : '') +
+      '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url=' +
+      encodeURIComponent(waMe) + ';end';
+    var btn = document.getElementById('btn');
+    btn.href = intent;
+    btn.addEventListener('click', function(){});
+    setTimeout(function(){ location.href = intent; }, 350);
   } else {
     document.getElementById('num').textContent = 'Number nahi mila';
   }
