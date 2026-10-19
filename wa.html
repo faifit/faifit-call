@@ -26,12 +26,9 @@
   var n = (new URLSearchParams(location.search).get('n') || '').replace(/\D/g, '');
   if (n) {
     document.getElementById('num').textContent = '+' + n;
-    var app = 'whatsapp://send?phone=' + n;
+    var app = 'https://wa.me/' + n;
     document.getElementById('btn').href = app;
     setTimeout(function(){ location.href = app; }, 350);
-    setTimeout(function(){
-      document.getElementById('btn').href = 'https://wa.me/' + n;
-    }, 2500);
   } else {
     document.getElementById('num').textContent = 'Number nahi mila';
   }
