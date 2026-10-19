@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAIFIT — Call</title>
+<style>
+  body { margin:0; background:#0d0d0f; color:#f2f2f2; font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+         display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .box { text-align:center; padding:24px; }
+  .num { font-size:26px; font-weight:800; letter-spacing:1px; margin:10px 0 22px; color:#fff; }
+  a.call { display:block; background:#2b6cb0; color:#fff; text-decoration:none; font-size:19px;
+           font-weight:800; padding:16px 34px; border-radius:14px; }
+  a.back { display:block; margin-top:16px; color:#d4a017; text-decoration:none; font-size:15px; }
+  .t { color:#d4a017; letter-spacing:2px; font-weight:800; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="t">FAIFIT</div>
+  <div class="num" id="num">…</div>
+  <a class="call" id="btn" href="#">📞 Call karein</a>
+  <a class="back" href="https://script.google.com/macros/s/AKfycbz_sgskIP3sJ_JQ8aZP0iVcjf1wjVsdeEGhZwE4_w1fa5mV3hZ66g8M-oD5cdnwbEnK4w/exec">← Wapas app par</a>
+</div>
+<script>
+  var n = (new URLSearchParams(location.search).get('n') || '').replace(/\D/g, '');
+  if (n) {
+    document.getElementById('num').textContent = '+' + n;
+    var tel = 'tel:+' + n;
+    document.getElementById('btn').href = tel;
+    setTimeout(function(){ location.href = tel; }, 350);
+  } else {
+    document.getElementById('num').textContent = 'Number nahi mila';
+  }
+</script>
+</body>
+</html>
