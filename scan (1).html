@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAIFIT — Scan CN</title>
+<style>
+  body { margin:0; background:#0d0d0f; color:#f2f2f2;
+         font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif; }
+  .wrap { max-width:520px; margin:0 auto; padding:14px; }
+  .t { color:#d4a017; letter-spacing:2px; font-weight:800; text-align:center; }
+  h1 { text-align:center; font-size:20px; margin:6px 0 12px; }
+  video { width:100%; border-radius:14px; background:#000; min-height:200px; }
+  .status { text-align:center; color:#9a9aa2; margin:10px 0; min-height:20px; font-size:14px; }
+  .row { display:flex; gap:8px; margin:10px 0; }
+  input { flex:1; background:#17171b; border:1px solid #2c2c33; color:#fff; border-radius:10px;
+          padding:13px; font-size:16px; text-transform:uppercase; }
+  button { border:0; border-radius:10px; font-weight:800; cursor:pointer; }
+  .add { background:#2b6cb0; color:#fff; padding:0 18px; font-size:15px; }
+  .item { display:flex; align-items:center; gap:8px; background:#17171b; border:1px solid #2c2c33;
+          border-radius:12px; padding:10px 12px; margin:8px 0; }
+  .cn { flex:1; font-weight:800; letter-spacing:.5px; word-break:break-all; }
+  .mode { padding:9px 10px; font-size:13px; background:#232329; color:#9a9aa2; }
+  .mode.onD { background:#2b6cb0; color:#fff; }
+  .mode.onR { background:#8a5a00; color:#fff; }
+  .del { background:#3a2323; color:#ff9c9c; padding:9px 12px; }
+  .send { display:block; width:100%; background:#1faa55; color:#fff; font-size:18px; padding:16px; margin-top:14px; }
+  .send:disabled { background:#2c2c33; color:#777; }
+  a.back { display:block; text-align:center; margin-top:14px; color:#d4a017; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="t">FAIFIT</div>
+  <h1>📷 Scan CN — Dispatch / Return</h1>
+  <video id="vid" autoplay playsinline muted></video>
+  <div class="status" id="status">Camera opening…</div>
+  <div class="row">
+    <input id="manual" placeholder="Type CN — VR…" autocomplete="off">
+    <button class="add" id="btnAdd">Add</button>
+  </div>
+  <div id="list"></div>
+  <button class="send" id="btnSend" disabled>Send to App (0)</button>
+  <a class="back" href="https://script.google.com/macros/s/AKfycbz_sgskIP3sJ_JQ8aZP0iVcjf1wjVsdeEGhZwE4_w1fa5mV3hZ66g8M-oD5cdnwbEnK4w/exec">← Back to App</a>
+</div>
+<script>
+  var APP = 'https://script.google.com/macros/s/AKfycbz_sgskIP3sJ_JQ8aZP0iVcjf1wjVsdeEGhZwE4_w1fa5mV3hZ66g8M-oD5cdnwbEnK4w/exec';
+  var items = [];
+  var statusEl = document.getElementById('status');
+  function clean(v){ return String(v || '').toUpperCase().replace(/[^A-Z0-9-]/g, ''); }
+  function looksLikeCN(cn){
+    if (cn.length < 8 || cn.length > 20) return false;
+    var digits = (cn.match(/\d/g) || []).length;
+    return digits >= 6;
+  }
+  function inList(cn){
+    for (var i = 0; i < items.length; i++) if (items[i].cn === cn) return true;
+    return false;
+  }
+  function addScan(raw){
+    var cn = clean(raw);
+    if (!cn || cn.length < 6) return;
+    if (inList(cn)) { statusEl.textContent = cn + ' is already in the list'; return; }
+    items.push({ cn: cn, mode: 'D' });
+    if (navigator.vibrate) navigator.vibrate(60);
+    statusEl.textContent = '✓ ' + cn + ' added';
+    render();
+  }
+  function render(){
+    var box = document.getElementById('list');
+    box.innerHTML = items.map(function(it, i){
+      return '<div class="item"><span class="cn">' + it.cn + '</span>' +
+        '<button class="mode ' + (it.mode === 'D' ? 'onD' : '') + '" data-m="D" data-i="' + i + '">🚚 Dispatch</button>' +
+        '<button class="mode ' + (it.mode === 'R' ? 'onR' : '') + '" data-m="R" data-i="' + i + '">↩️ Return</button>' +
+        '<button class="del" data-del="' + i + '">✕</button></div>';
+    }).join('');
+    box.querySelectorAll('[data-m]').forEach(function(b){
+      b.addEventListener('click', function(){ items[+b.getAttribute('data-i')].mode = b.getAttribute('data-m'); render(); });
+    });
+    box.querySelectorAll('[data-del]').forEach(function(b){
+      b.addEventListener('click', function(){ items.splice(+b.getAttribute('data-del'), 1); render(); });
+    });
+    var s = document.getElementById('btnSend');
+    s.disabled = !items.length;
+    s.textContent = 'Send to App (' + items.length + ')';
+  }
+  document.getElementById('btnAdd').addEventListener('click', function(){
+    var inp = document.getElementById('manual');
+    addScan(inp.value); inp.value = ''; inp.focus();
+  });
+  document.getElementById('manual').addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){ e.preventDefault(); document.getElementById('btnAdd').click(); }
+  });
+  document.getElementById('btnSend').addEventListener('click', function(){
+    var q = items.map(function(it){ return it.cn + ':' + it.mode; }).join(',');
+    location.href = APP + '?scans=' + encodeURIComponent(q);
+  });
+  (async function(){
+    var vid = document.getElementById('vid');
+    if (!('BarcodeDetector' in window)) {
+      statusEl.textContent = 'Auto-scan is not supported in this browser — type the CN and tap Add.';
+      return;
+    }
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      vid.srcObject = stream;
+      var det = new BarcodeDetector({ formats: ['code_128','code_39','code_93','ean_13','ean_8','upc_a','upc_e','qr_code','itf'] });
+      statusEl.textContent = 'Show the barcode to the camera…';
+      var locked = false, clearFrames = 0;
+      setInterval(async function(){
+        if (vid.readyState < 2) return;
+        try {
+          var codes = await det.detect(vid);
+          var v = '';
+          if (codes && codes.length) {
+            for (var i = 0; i < codes.length; i++) {
+              var c = clean(codes[i].rawValue);
+              if (looksLikeCN(c)) { v = c; break; }
+            }
+          }
+          if (locked) {
+            if (!v) {
+              clearFrames++;
+              if (clearFrames >= 3) {
+                locked = false; clearFrames = 0;
+                statusEl.textContent = 'Ready — show the next barcode';
+              }
+            } else clearFrames = 0;
+            return;
+          }
+          if (v) {
+            if (inList(v)) statusEl.textContent = v + ' is already in the list';
+            else addScan(v);
+            locked = true; clearFrames = 0;
+          }
+        } catch (e) {}
+      }, 300);
+    } catch (e) {
+      statusEl.textContent = 'Camera permission not given — type the CN and tap Add.';
+    }
+  })();
+</script>
+</body>
+</html>
