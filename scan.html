@@ -12,6 +12,11 @@
   h1 { text-align:center; font-size:20px; margin:6px 0 12px; }
   video { width:100%; border-radius:14px; background:#000; min-height:200px; }
   .status { text-align:center; color:#9a9aa2; margin:10px 0; min-height:20px; font-size:14px; }
+  .modes { display:flex; gap:8px; margin:10px 0; }
+  .bigmode { flex:1; padding:14px 6px; font-size:16px; background:#232329; color:#9a9aa2;
+             border:2px solid #2c2c33; border-radius:12px; font-weight:800; cursor:pointer; }
+  .bigmode.onD { background:#2b6cb0; color:#fff; border-color:#2b6cb0; }
+  .bigmode.onR { background:#8a5a00; color:#fff; border-color:#8a5a00; }
   .row { display:flex; gap:8px; margin:10px 0; }
   input { flex:1; background:#17171b; border:1px solid #2c2c33; color:#fff; border-radius:10px;
           padding:13px; font-size:16px; text-transform:uppercase; }
@@ -23,16 +28,22 @@
   .mode { padding:9px 10px; font-size:13px; background:#232329; color:#9a9aa2; }
   .mode.onD { background:#2b6cb0; color:#fff; }
   .mode.onR { background:#8a5a00; color:#fff; }
+  .st { font-size:15px; min-width:22px; text-align:center; }
   .del { background:#3a2323; color:#ff9c9c; padding:9px 12px; }
-  .send { display:block; width:100%; background:#1faa55; color:#fff; font-size:18px; padding:16px; margin-top:14px; }
-  .send:disabled { background:#2c2c33; color:#777; }
+  .note { text-align:center; color:#777; font-size:12px; margin-top:12px; }
+  .clear { display:block; margin:10px auto 0; background:none; color:#9a9aa2; font-size:13px;
+           text-decoration:underline; padding:6px; }
   a.back { display:block; text-align:center; margin-top:14px; color:#d4a017; text-decoration:none; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="t">FAIFIT</div>
-  <h1>📷 Scan CN — Dispatch / Return</h1>
+  <h1>📷 Scan CN — Auto Save</h1>
+  <div class="modes">
+    <button class="bigmode onD" id="modeD">🚚 Dispatch</button>
+    <button class="bigmode" id="modeR">↩️ Return</button>
+  </div>
   <video id="vid" autoplay playsinline muted></video>
   <div class="status" id="status">Camera opening…</div>
   <div class="row">
@@ -40,12 +51,14 @@
     <button class="add" id="btnAdd">Add</button>
   </div>
   <div id="list"></div>
-  <button class="send" id="btnSend" disabled>Send to App (0)</button>
-  <a class="back" href="https://script.google.com/macros/s/AKfycbz_sgskIP3sJ_JQ8aZP0iVcjf1wjVsdeEGhZwE4_w1fa5mV3hZ66g8M-oD5cdnwbEnK4w/exec">← Back to App</a>
+  <button class="clear" id="btnClear" style="display:none">Clear saved list</button>
+  <div class="note">Just keep scanning — every CN saves to the sheet by itself. ✓ = saved.</div>
+  <a class="back" href="https://script.google.com/macros/s/AKfycbzuTY5mdf_RvYQUgNKUQ2m4vj03Jt_KX8R2Cy_s36aHFvPhEbnw4pKvk19BBkUzb0w4pg/exec">← Back to App</a>
 </div>
 <script>
-  var APP = 'https://script.google.com/macros/s/AKfycbz_sgskIP3sJ_JQ8aZP0iVcjf1wjVsdeEGhZwE4_w1fa5mV3hZ66g8M-oD5cdnwbEnK4w/exec';
+  var APP = 'https://script.google.com/macros/s/AKfycbzuTY5mdf_RvYQUgNKUQ2m4vj03Jt_KX8R2Cy_s36aHFvPhEbnw4pKvk19BBkUzb0w4pg/exec';
   var items = [];
+  var CURMODE = 'D';
   var statusEl = document.getElementById('status');
   function clean(v){ return String(v || '').toUpperCase().replace(/[^A-Z0-9-]/g, ''); }
   function looksLikeCN(cn){
@@ -57,43 +70,92 @@
     for (var i = 0; i < items.length; i++) if (items[i].cn === cn) return true;
     return false;
   }
+  var sending = false, flushTimer = null;
+  function scheduleFlush(){
+    if (flushTimer) clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, 1200);
+  }
+  function flush(){
+    if (sending) { scheduleFlush(); return; }
+    var batch = items.filter(function(it){ return !it.sent; });
+    if (!batch.length) return;
+    sending = true;
+    fetch(APP, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ items: batch.map(function(it){
+        return { cn: it.cn, mode: it.mode }; }) })
+    }).then(function(){
+      batch.forEach(function(it){ it.sent = true; });
+      sending = false;
+      statusEl.textContent = '✓ ' + batch[batch.length - 1].cn + ' saved to the sheet';
+      render();
+      if (items.some(function(it){ return !it.sent; })) scheduleFlush();
+    }).catch(function(){
+      sending = false;
+      statusEl.textContent = '⚠ Could not save — will keep trying';
+      render();
+    });
+  }
+  setInterval(function(){
+    if (!sending && items.some(function(it){ return !it.sent; })) flush();
+  }, 5000);
   function addScan(raw){
     var cn = clean(raw);
     if (!cn || cn.length < 6) return;
     if (inList(cn)) { statusEl.textContent = cn + ' is already in the list'; return; }
-    items.push({ cn: cn, mode: 'D' });
+    items.push({ cn: cn, mode: CURMODE, sent: false });
     if (navigator.vibrate) navigator.vibrate(60);
-    statusEl.textContent = '✓ ' + cn + ' added';
+    statusEl.textContent = '✓ ' + cn + ' — saving…';
     render();
+    scheduleFlush();
   }
   function render(){
     var box = document.getElementById('list');
     box.innerHTML = items.map(function(it, i){
       return '<div class="item"><span class="cn">' + it.cn + '</span>' +
-        '<button class="mode ' + (it.mode === 'D' ? 'onD' : '') + '" data-m="D" data-i="' + i + '">🚚 Dispatch</button>' +
-        '<button class="mode ' + (it.mode === 'R' ? 'onR' : '') + '" data-m="R" data-i="' + i + '">↩️ Return</button>' +
+        '<button class="mode ' + (it.mode === 'D' ? 'onD' : 'onR') + '" data-flip="' + i + '">' +
+          (it.mode === 'D' ? '🚚 Dispatch' : '↩️ Return') + '</button>' +
+        '<span class="st">' + (it.sent ? '✅' : '⏳') + '</span>' +
         '<button class="del" data-del="' + i + '">✕</button></div>';
     }).join('');
-    box.querySelectorAll('[data-m]').forEach(function(b){
-      b.addEventListener('click', function(){ items[+b.getAttribute('data-i')].mode = b.getAttribute('data-m'); render(); });
+    box.querySelectorAll('[data-flip]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var it = items[+b.getAttribute('data-flip')];
+        if (it.sent) return;
+        it.mode = it.mode === 'D' ? 'R' : 'D';
+        render(); scheduleFlush();
+      });
     });
     box.querySelectorAll('[data-del]').forEach(function(b){
-      b.addEventListener('click', function(){ items.splice(+b.getAttribute('data-del'), 1); render(); });
+      b.addEventListener('click', function(){
+        items.splice(+b.getAttribute('data-del'), 1); render();
+      });
     });
-    var s = document.getElementById('btnSend');
-    s.disabled = !items.length;
-    s.textContent = 'Send to App (' + items.length + ')';
+    document.getElementById('btnClear').style.display =
+      items.some(function(it){ return it.sent; }) ? '' : 'none';
   }
+  document.getElementById('modeD').addEventListener('click', function(){
+    CURMODE = 'D';
+    this.className = 'bigmode onD';
+    document.getElementById('modeR').className = 'bigmode';
+  });
+  document.getElementById('modeR').addEventListener('click', function(){
+    CURMODE = 'R';
+    this.className = 'bigmode onR';
+    document.getElementById('modeD').className = 'bigmode';
+  });
+  document.getElementById('btnClear').addEventListener('click', function(){
+    items = items.filter(function(it){ return !it.sent; });
+    render();
+  });
   document.getElementById('btnAdd').addEventListener('click', function(){
     var inp = document.getElementById('manual');
     addScan(inp.value); inp.value = ''; inp.focus();
   });
   document.getElementById('manual').addEventListener('keydown', function(e){
     if (e.key === 'Enter'){ e.preventDefault(); document.getElementById('btnAdd').click(); }
-  });
-  document.getElementById('btnSend').addEventListener('click', function(){
-    var q = items.map(function(it){ return it.cn + ':' + it.mode; }).join(',');
-    location.href = APP + '?scans=' + encodeURIComponent(q);
   });
   (async function(){
     var vid = document.getElementById('vid');
