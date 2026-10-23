@@ -70,7 +70,24 @@
     if (actx && actx.state === 'suspended') actx.resume();
     return actx;
   }
-  document.addEventListener('pointerdown', function(){ if (SOUND) audio(); }, true);
+  var savedAudio = null, savedPrimed = false;
+  try {
+    savedAudio = new Audio('saved.mp3');
+    savedAudio.preload = 'auto';
+  } catch (e) {}
+  function primeSaved(){
+    if (!savedAudio || savedPrimed) return;
+    savedPrimed = true;
+    try {
+      savedAudio.volume = 0;
+      var p = savedAudio.play();
+      if (p && p.then) p.then(function(){
+        savedAudio.pause(); savedAudio.currentTime = 0; savedAudio.volume = 1;
+      }).catch(function(){ savedAudio.volume = 1; });
+      else savedAudio.volume = 1;
+    } catch (e) {}
+  }
+  document.addEventListener('pointerdown', function(){ if (SOUND) { audio(); primeSaved(); } }, true);
   function tone(f, delay, dur, type){
     var ac = audio(); if (!ac) return;
     try {
@@ -86,14 +103,12 @@
   }
   function blip(){ if (SOUND) tone(700, 0, 0.08, 'square'); }
   function speakSaved(){
-    if (!SOUND) return;
+    if (!SOUND || !savedAudio) return;
     try {
-      if ('speechSynthesis' in window) {
-        speechSynthesis.cancel();
-        var u = new SpeechSynthesisUtterance('Saved');
-        u.lang = 'en-US'; u.rate = 1.05;
-        speechSynthesis.speak(u);
-      }
+      savedAudio.volume = 1;
+      savedAudio.currentTime = 0;
+      var p = savedAudio.play();
+      if (p && p.catch) p.catch(function(){});
     } catch (e) {}
   }
   function savedSound(){ if (!SOUND) return; tone(880, 0, 0.12); tone(1318, 0.1, 0.18); speakSaved(); }
@@ -103,7 +118,7 @@
     SOUND = !SOUND;
     try { localStorage.setItem('faifit_sound', SOUND ? 'on' : 'off'); } catch (e) {}
     drawSound();
-    if (SOUND) { audio(); savedSound(); }
+    if (SOUND) { audio(); primeSaved(); savedPrimed = false; primeSaved(); savedSound(); }
   });
   drawSound();
   try {
