@@ -34,12 +34,14 @@
   .clear { display:block; margin:10px auto 0; background:none; color:#9a9aa2; font-size:13px;
            text-decoration:underline; padding:6px; }
   a.back { display:block; text-align:center; margin-top:14px; color:#d4a017; text-decoration:none; }
+  .sndbtn { display:block; margin:0 auto 10px; background:#232329; color:#f2f2f2; padding:9px 16px; font-size:14px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="t">FAIFIT</div>
   <h1>📷 Scan CN — Auto Save</h1>
+  <button class="sndbtn" id="btnSound">🔊 Sound: On</button>
   <div class="modes">
     <button class="bigmode onD" id="modeD">🚚 Dispatch</button>
     <button class="bigmode" id="modeR">↩️ Return</button>
@@ -60,6 +62,50 @@
   var items = [];
   var CURMODE = 'D';
   var statusEl = document.getElementById('status');
+  var SOUND = true;
+  try { SOUND = localStorage.getItem('faifit_sound') !== 'off'; } catch (e) {}
+  var actx = null;
+  function audio(){
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    if (actx && actx.state === 'suspended') actx.resume();
+    return actx;
+  }
+  document.addEventListener('pointerdown', function(){ if (SOUND) audio(); }, true);
+  function tone(f, delay, dur, type){
+    var ac = audio(); if (!ac) return;
+    try {
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || 'sine'; o.frequency.value = f;
+      var s = ac.currentTime + (delay || 0);
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(0.25, s + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + (dur || 0.12));
+      o.connect(g); g.connect(ac.destination);
+      o.start(s); o.stop(s + (dur || 0.12) + 0.05);
+    } catch (e) {}
+  }
+  function blip(){ if (SOUND) tone(700, 0, 0.08, 'square'); }
+  function speakSaved(){
+    if (!SOUND) return;
+    try {
+      if ('speechSynthesis' in window) {
+        speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance('Saved');
+        u.lang = 'en-US'; u.rate = 1.05;
+        speechSynthesis.speak(u);
+      }
+    } catch (e) {}
+  }
+  function savedSound(){ if (!SOUND) return; tone(880, 0, 0.12); tone(1318, 0.1, 0.18); speakSaved(); }
+  var btnSound = document.getElementById('btnSound');
+  function drawSound(){ btnSound.textContent = SOUND ? '🔊 Sound: On' : '🔇 Sound: Off'; }
+  btnSound.addEventListener('click', function(){
+    SOUND = !SOUND;
+    try { localStorage.setItem('faifit_sound', SOUND ? 'on' : 'off'); } catch (e) {}
+    drawSound();
+    if (SOUND) { audio(); savedSound(); }
+  });
+  drawSound();
   try {
     var saved = JSON.parse(localStorage.getItem('faifit_scans') || '[]');
     if (Array.isArray(saved)) items = saved.filter(function(it){
@@ -98,6 +144,7 @@
     }).then(function(){
       batch.forEach(function(it){ it.sent = true; });
       sending = false;
+      savedSound();
       statusEl.textContent = '✓ ' + batch[batch.length - 1].cn + ' saved to the sheet';
       render();
       if (items.some(function(it){ return !it.sent; })) scheduleFlush();
@@ -116,6 +163,7 @@
     if (inList(cn)) { statusEl.textContent = cn + ' is already in the list'; return; }
     items.push({ cn: cn, mode: CURMODE, sent: false });
     if (navigator.vibrate) navigator.vibrate(60);
+    blip();
     statusEl.textContent = '✓ ' + cn + ' — saving…';
     render();
     scheduleFlush();
