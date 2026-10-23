@@ -138,6 +138,7 @@
     fetch(APP, {
       method: 'POST',
       mode: 'no-cors',
+      credentials: 'include',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ items: batch.map(function(it){
         return { cn: it.cn, mode: it.mode }; }) })
