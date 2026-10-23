@@ -244,7 +244,7 @@
       vid.srcObject = stream;
       var det = new BarcodeDetector({ formats: ['code_128','code_39','code_93','ean_13','ean_8','upc_a','upc_e','qr_code','itf'] });
       statusEl.textContent = 'Show the barcode to the camera…';
-      var locked = false, clearFrames = 0;
+      var locked = false, clearFrames = 0, lastCode = '';
       setInterval(async function(){
         if (vid.readyState < 2) return;
         try {
@@ -257,9 +257,16 @@
             }
           }
           if (locked) {
-            if (!v) {
+            if (v && v !== lastCode) {
+              // Doosra label samne aa gaya — pehle wale ke hatne ka
+              // intezar kiye baghair isay scan karo (parcels ke dhair
+              // mein yehi hota hy, warna naya label reh jata tha).
+              if (inList(v)) statusEl.textContent = v + ' is already saved in the list';
+              else addScan(v);
+              lastCode = v; clearFrames = 0;
+            } else if (!v) {
               clearFrames++;
-              if (clearFrames >= 3) {
+              if (clearFrames >= 2) {
                 locked = false; clearFrames = 0;
                 statusEl.textContent = 'Ready — show the next barcode';
               }
@@ -269,7 +276,7 @@
           if (v) {
             if (inList(v)) statusEl.textContent = v + ' is already saved in the list';
             else addScan(v);
-            locked = true; clearFrames = 0;
+            locked = true; lastCode = v; clearFrames = 0;
           }
         } catch (e) {}
       }, 300);
