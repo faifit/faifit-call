@@ -81,6 +81,7 @@
     <h1>FAIFIT <span>🏷️ LABELS</span></h1>
     <div class="sub">Sheet se direct — print karo, parcel par lagao, scan karo.</div>
     <div class="src" id="srcLine">Data load ho raha hai…</div>
+    <div class="src" id="bookMsg" style="display:none"></div>
   </header>
   <div class="rowbtns">
     <button class="btn btn-ghost btn-sm" id="btnAll">Sab select karo</button>
@@ -134,6 +135,7 @@ function norm(o){
 }
 var ORDERS = [];
 var SELECTED = {};
+var IS_GAS = false;
 function loadLive(cb){
   if (window.google && google.script && google.script.run) {
     try {
@@ -161,10 +163,21 @@ function render(){
   }).join('');
   if (!nocn.length) ln.innerHTML = '<div class="note">Sab ke CN maujood hain.</div>';
   else ln.innerHTML = nocn.map(function(o){
+    var btn = '';
+    if (o.status === 'Ready to Dispatch') {
+      btn = IS_GAS
+        ? '<br><button class="btn btn-gold btn-sm bookBtn" data-id="' + esc(o.id) + '">📦 Book karo — Leopards</button>'
+        : '<br><span style="color:#ff9f43">Booking sirf app se hoti hai — GitHub page se nahi.</span>';
+    }
     return '<div class="pick nocn"><span><span class="nm">' + esc(o.customer) + ' — ' + esc(o.id) + '</span>' +
       '<span class="mut"><br>' + esc(o.city) + ' · ' + esc(o.product || '—') +
-      '<br><span class="cod">' + esc(fmtCod(o.cod)) + '</span> · ' + esc(o.status) + ' · CN nahi hai — Bulk Dispatch se booking karo, phir label banega.</span></span></div>';
+      '<br><span class="cod">' + esc(fmtCod(o.cod)) + '</span> · ' + esc(o.status) + ' · CN nahi hai — ' +
+      (o.status === 'Ready to Dispatch' ? 'neeche Book dabao, CN aa kar label ban jayega.' : 'pehle confirm karo, phir booking hogi.') +
+      '</span>' + btn + '</span></div>';
   }).join('');
+  ln.querySelectorAll('.bookBtn').forEach(function(b){
+    b.addEventListener('click', function(){ bookOne(b.getAttribute('data-id'), b); });
+  });
   lr.querySelectorAll('input[type=checkbox]').forEach(function(cb){
     cb.addEventListener('change', function(){ SELECTED[cb.getAttribute('data-id')] = cb.checked; drawLabels(); });
   });
@@ -207,7 +220,35 @@ function setSource(mode){
   if (mode === 'live') { el.textContent = '● LIVE — sheet se abhi load hua'; el.className = 'src'; }
   else { el.textContent = '● SNAPSHOT — ' + SNAPSHOT_TIME + ' ka data (live ke liye app wala Labels use karo)'; el.className = 'src snap'; }
 }
+function showBookMsg(txt, ok){
+  var el = document.getElementById('bookMsg');
+  el.style.display = 'block';
+  el.textContent = txt;
+  el.className = 'src' + (ok ? '' : ' snap');
+}
+function bookOne(id, btn){
+  var o = null;
+  ORDERS.forEach(function(x){ if (x.id === id) o = x; });
+  if (!o) return;
+  if (!confirm('Pakka? ' + o.customer + ' (' + o.id + ') ki Leopards par ASAL booking hogi — CN milega aur parcel Dispatched ho jayega.')) return;
+  btn.disabled = true; btn.textContent = 'Book ho raha hai…';
+  showBookMsg('Booking ho rahi hai — ' + o.id + '…', true);
+  google.script.run.withSuccessHandler(function(res){
+    if (res && res.ok) {
+      o.cn = res.cn; o.status = 'Dispatched';
+      showBookMsg('✅ ' + o.id + ' booked — CN ' + res.cn + '. Label print ke liye tayyar hai.', true);
+      render();
+    } else {
+      showBookMsg('❌ ' + o.id + ': ' + ((res && res.msg) || 'Booking nahi hui.'), false);
+      btn.disabled = false; btn.textContent = '📦 Book karo — Leopards';
+    }
+  }).withFailureHandler(function(err){
+    showBookMsg('❌ ' + o.id + ': ' + (err && err.message ? err.message : 'Booking nahi hui.'), false);
+    btn.disabled = false; btn.textContent = '📦 Book karo — Leopards';
+  }).bookOrder(id);
+}
 function boot(){
+  IS_GAS = !!(window.google && google.script && google.script.run);
   var started = loadLive(function(list, mode){
     if (list) { ORDERS = list; setSource('live'); }
     else { ORDERS = SNAPSHOT_ORDERS.map(norm).filter(isReal); setSource('snap'); }
