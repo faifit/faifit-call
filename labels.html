@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAIFIT — Shipping Labels</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+         background:#0d0d0f; color:#f2f2f2; }
+  .chrome { max-width:720px; margin:0 auto; padding:14px 14px 110px; }
+  header { border-bottom:2px solid #d4a017; padding:12px 2px 10px; }
+  h1 { margin:0; font-size:22px; letter-spacing:2px; }
+  h1 span { color:#d4a017; }
+  .sub { font-size:12px; color:#bdbdbd; margin-top:3px; }
+  .src { font-size:12px; margin-top:8px; padding:8px 10px; border-radius:10px;
+         background:#1a1a1e; border:1px solid #2c2c31; color:#ffd94d; }
+  .src.snap { color:#ff9f43; }
+  h2.sec { font-size:13px; color:#d4a017; letter-spacing:1px; margin:18px 2px 8px;
+           text-transform:uppercase; }
+  .pick { background:#17171b; border:1px solid #2a2a30; border-radius:12px;
+          padding:10px 12px; margin-bottom:8px; display:flex; gap:10px; align-items:flex-start; }
+  .pick input { width:20px; height:20px; margin-top:2px; flex:none; accent-color:#d4a017; }
+  .pick .nm { font-weight:800; font-size:15px; }
+  .pick .mut { color:#a8a8a8; font-size:12.5px; margin-top:2px; line-height:1.45; }
+  .pick .cod { color:#ffd94d; font-weight:700; }
+  .pick.nocn { opacity:.65; }
+  .pick.nocn .nm { color:#ff9c9c; }
+  .bar { position:fixed; left:0; right:0; bottom:0; z-index:5;
+         background:#141416; border-top:2px solid #d4a017; padding:12px 14px;
+         display:flex; gap:10px; align-items:center; }
+  .bar .count { flex:1; font-size:14px; }
+  .btn { border:0; border-radius:10px; font-weight:800; cursor:pointer;
+         padding:13px 18px; font-size:15px; }
+  .btn-gold { background:#d4a017; color:#111; }
+  .btn-ghost { background:#232329; color:#f2f2f2; }
+  .btn-sm { padding:8px 12px; font-size:13px; }
+  .rowbtns { display:flex; gap:8px; margin:10px 2px 0; }
+  .note { font-size:12px; color:#8a8a8a; margin:12px 2px; line-height:1.5; }
+  .labels { padding:0; }
+  /* ---- printable label: 4x6 inch (100 x 150 mm), white on black text ---- */
+  .label { display:none; }
+  .label.show { display:block; }
+  .label .inner { width:100mm; height:150mm; background:#fff; color:#111;
+    margin:0 auto 16px; padding:8mm 7mm 6mm; position:relative;
+    border:1px dashed #999; overflow:hidden; }
+  .label .ship { font-size:11px; letter-spacing:2px; color:#555; }
+  .label .brand { font-size:26px; font-weight:900; letter-spacing:3px; color:#111; }
+  .label .brand span { color:#b8860b; }
+  .label .codline { position:absolute; top:8mm; right:7mm; text-align:right; }
+  .label .codline .amt { font-size:24px; font-weight:900; }
+  .label .codline .cap { font-size:10px; letter-spacing:1px; color:#555; }
+  .label hr { border:0; border-top:2px solid #111; margin:4mm 0; }
+  .label .to { font-size:11px; letter-spacing:1px; color:#555; }
+  .label .name { font-size:20px; font-weight:900; line-height:1.15; margin-top:1mm; }
+  .label .phone { font-size:16px; font-weight:700; margin-top:1mm; }
+  .label .addr { font-size:14px; line-height:1.35; margin-top:2mm; }
+  .label .city { font-size:17px; font-weight:900; margin-top:1mm; }
+  .label .prod { font-size:12.5px; color:#333; margin-top:3mm; line-height:1.35; }
+  .label .bc { position:absolute; left:7mm; right:7mm; bottom:6mm; text-align:center; }
+  .label .bc svg { width:100%; height:16mm; }
+  .label .bc .cn { font-size:15px; font-weight:800; letter-spacing:1px; margin-top:1mm; }
+  .label .foot { position:absolute; left:7mm; right:7mm; bottom:2.5mm;
+    font-size:9.5px; color:#777; display:flex; justify-content:space-between; }
+  @media print {
+    body { background:#fff; }
+    .chrome, .bar { display:none !important; }
+    .labels { padding:0; margin:0; }
+    .label { display:none; }
+    .label.show { display:block; page-break-after:always; }
+    .label.show:last-child { page-break-after:auto; }
+    .label .inner { border:0; margin:0; }
+    @page { size:100mm 150mm; margin:0; }
+  }
+</style>
+</head>
+<body>
+<div class="chrome">
+  <header>
+    <h1>FAIFIT <span>🏷️ LABELS</span></h1>
+    <div class="sub">Sheet se direct — print karo, parcel par lagao, scan karo.</div>
+    <div class="src" id="srcLine">Data load ho raha hai…</div>
+  </header>
+  <div class="rowbtns">
+    <button class="btn btn-ghost btn-sm" id="btnAll">Sab select karo</button>
+    <button class="btn btn-ghost btn-sm" id="btnNone">Sab hatado</button>
+    <button class="btn btn-ghost btn-sm" id="btnRefresh">↻ Refresh</button>
+  </div>
+  <h2 class="sec">Print karo — CN maujood hai</h2>
+  <div id="listReady"></div>
+  <h2 class="sec">CN nahi hai — pehle booking karo</h2>
+  <div id="listNoCN"></div>
+  <div class="note">Label size 4×6 inch (100×150 mm) hai — printer mein ye size select karo.
+    Barcode mein CN hota hai; scan karne se order Dispatched hota hai.
+    Leopards ka official slip phir bhi portal se milta hai — ye FAIFIT packing label hai.</div>
+</div>
+<div class="labels" id="labels"></div>
+<div class="bar">
+  <div class="count" id="selCount">0 label select</div>
+  <button class="btn btn-gold" id="btnPrint">🖨️ Print karo</button>
+</div>
+<script>
+var SNAPSHOT_ORDERS = [{"id": "5145", "customer": "Sulema ", "phone": "3038425145", "city": "Kotla /gujrat", "address": "Care security and cctv camera ear chwk police station kakarali bhimbe road kotla ", "product": "cami vest", "size": "belly 43,chest 42", "qty": "", "cod": "2300", "courier": "Leopards", "cn": "VR7547851428", "status": "Out for Delivery", "calc": "Include", "remarks": ""}, {"id": "#51015", "customer": "Ejaz Ahmed", "phone": "3337887435", "city": "Sharigh", "address": "Tehsil and postoffice sharigh disst Harnai", "product": "Zipper Cami Men Vest", "size": "Black / XL", "qty": "1", "cod": "2299", "courier": "Leopards", "cn": "VR7547845039", "status": "Out for Delivery", "calc": "Include", "remarks": ""}, {"id": "#51019", "customer": "Lal Hussain", "phone": "3168671400", "city": "Quetta", "address": "Sarib rod kastam bolan labatri Zahoor p co kastam", "product": "Zip + Hook Sweat Belt", "size": "4XL", "qty": "1", "cod": "1999", "courier": "Leopards", "cn": "VR7547972196", "status": "Out for Delivery", "calc": "Include", "remarks": ""}, {"id": "#51028", "customer": "Kamran Ishfaq", "phone": "3710459676", "city": "Gujrat", "address": "Gujrat gts chwk", "product": "Cami Men Vest – Men's Neoprene Slimming Vest", "size": "3XL", "qty": "1", "cod": "2299", "courier": "", "cn": "", "status": "Pending", "calc": "Include", "remarks": ""}, {"id": "#51030", "customer": "Waqas shabir Shabir ahmad", "phone": "3137751752", "city": "Tahsil Kamoki Zilla Gujranwala", "address": "Waqas dental surgari allama iqbal Road near bilal traders", "product": "Zipper Cami Men Vest", "size": "Black / 4XL", "qty": "1", "cod": "2499", "courier": "", "cn": "", "status": "Pending", "calc": "Include", "remarks": ""}, {"id": "M-1010", "customer": "FAIFIT", "phone": "3171727207", "city": "Jhang", "address": "faislabad phatak near nadra office", "product": "", "size": "", "qty": "", "cod": "2599", "courier": "Leopards", "cn": "", "status": "Ready to Dispatch", "calc": "Include", "remarks": ""}, {"id": "M-1013", "customer": "SALMAN SALMAN MALIK", "phone": "3112124019", "city": "Loralai", "address": "Sinma Gali Zob Rod Loralai", "product": "", "size": "", "qty": "", "cod": "1700", "courier": "Leopards", "cn": "VR7547834633", "status": "Dispatched", "calc": "Include", "remarks": ""}, {"id": "M-1014", "customer": "ANSER SB", "phone": "3006403979", "city": "Sialkot", "address": "Gym Above Kota Tea Stall Near Allied  Bank Maira Adda Tehsil Daska District Sialkot", "product": "", "size": "", "qty": "", "cod": "2300", "courier": "Leopards", "cn": "VR7547962802", "status": "Pending", "calc": "Include", "remarks": ""}];
+var SNAPSHOT_TIME = '6 Nov 2026, 21:52 PKT';
+var PRINT_STATES = ['Pending', 'Ready to Dispatch', 'Dispatched', 'Out for Delivery', 'In Transit'];
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fmtPhone(p){
+  var d = String(p || '').replace(/\D/g, '');
+  if (d.length === 10 && d.charAt(0) === '3') return '0' + d;
+  if (d.length === 11 && d.slice(0, 2) === '03') return d;
+  return String(p || '');
+}
+function fmtCod(v){
+  var n = parseFloat(String(v || '').replace(/,/g, ''));
+  if (isNaN(n)) return 'Rs —';
+  return 'Rs ' + Math.round(n).toLocaleString('en-US');
+}
+function isReal(o){
+  if (!o || !o.id) return false;
+  if ((o.status || '') === 'Cancelled') return false;
+  if (String(o.id).indexOf('PD-') === 0) return false;
+  if (String(o.remarks || '').indexOf('DUPLICATE') !== -1) return false;
+  if ((o.calc || '') === 'Exclude') return false;
+  return true;
+}
+function norm(o){
+  return { id: o.id || '', customer: o.customer || '', phone: o.phone || '',
+    city: o.city || '', address: o.address || '', product: o.product || '',
+    size: o.size || '', qty: o.qty || '', cod: o.cod || '',
+    courier: o.courier || '', cn: o.cn || '', status: o.status || '',
+    calc: o.calc || '', remarks: o.remarks || '' };
+}
+var ORDERS = [];
+var SELECTED = {};
+function loadLive(cb){
+  if (window.google && google.script && google.script.run) {
+    try {
+      google.script.run.withSuccessHandler(function(res){
+        var list = (res && res.orders) ? res.orders.map(norm).filter(isReal) : [];
+        cb(list, 'live');
+      }).withFailureHandler(function(){ cb(null, 'live-fail'); }).getData();
+      return true;
+    } catch (e) { return false; }
+  }
+  return false;
+}
+function render(){
+  var ready = ORDERS.filter(function(o){ return o.cn && PRINT_STATES.indexOf(o.status) !== -1; });
+  var nocn = ORDERS.filter(function(o){ return !o.cn && (o.status === 'Pending' || o.status === 'Ready to Dispatch'); });
+  var lr = document.getElementById('listReady');
+  var ln = document.getElementById('listNoCN');
+  if (!ready.length) lr.innerHTML = '<div class="note">Koi label tayyar nahi — CN wala order Pending / Ready / Dispatched mein nahi hai.</div>';
+  else lr.innerHTML = ready.map(function(o){
+    var ck = SELECTED[o.id] === undefined ? true : SELECTED[o.id];
+    return '<label class="pick"><input type="checkbox" data-id="' + esc(o.id) + '"' + (ck ? ' checked' : '') + '>' +
+      '<span><span class="nm">' + esc(o.customer) + ' — ' + esc(o.id) + '</span>' +
+      '<span class="mut"><br>' + esc(o.city) + ' · ' + esc(o.product || '—') + (o.size ? ' (' + esc(o.size) + ')' : '') +
+      '<br>CN ' + esc(o.cn) + ' · <span class="cod">' + esc(fmtCod(o.cod)) + '</span> · ' + esc(o.status) + '</span></span></label>';
+  }).join('');
+  if (!nocn.length) ln.innerHTML = '<div class="note">Sab ke CN maujood hain.</div>';
+  else ln.innerHTML = nocn.map(function(o){
+    return '<div class="pick nocn"><span><span class="nm">' + esc(o.customer) + ' — ' + esc(o.id) + '</span>' +
+      '<span class="mut"><br>' + esc(o.city) + ' · ' + esc(o.product || '—') +
+      '<br><span class="cod">' + esc(fmtCod(o.cod)) + '</span> · ' + esc(o.status) + ' · CN nahi hai — Bulk Dispatch se booking karo, phir label banega.</span></span></div>';
+  }).join('');
+  lr.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+    cb.addEventListener('change', function(){ SELECTED[cb.getAttribute('data-id')] = cb.checked; drawLabels(); });
+  });
+  drawLabels();
+}
+function drawLabels(){
+  var wrap = document.getElementById('labels');
+  var chosen = ORDERS.filter(function(o){
+    return o.cn && PRINT_STATES.indexOf(o.status) !== -1 && (SELECTED[o.id] === undefined || SELECTED[o.id]);
+  });
+  document.getElementById('selCount').textContent = chosen.length + ' label select';
+  wrap.innerHTML = chosen.map(function(o){
+    return '<div class="label show" data-id="' + esc(o.id) + '"><div class="inner">' +
+      '<div class="ship">SHIP TO · ' + esc((o.courier || 'Leopards').toUpperCase()) + '</div>' +
+      '<div class="brand">FAIFIT<span>.</span></div>' +
+      '<div class="codline"><div class="amt">' + esc(fmtCod(o.cod)) + '</div><div class="cap">CASH ON DELIVERY</div></div>' +
+      '<hr><div class="to">TO</div>' +
+      '<div class="name">' + esc(o.customer) + '</div>' +
+      '<div class="phone">' + esc(fmtPhone(o.phone)) + '</div>' +
+      '<div class="addr">' + esc(o.address) + '</div>' +
+      '<div class="city">' + esc(o.city) + '</div>' +
+      '<div class="prod">' + esc(o.product || '') + (o.size ? ' — ' + esc(o.size) : '') + (o.qty ? ' × ' + esc(o.qty) : '') + '</div>' +
+      '<div class="bc"><svg class="barcode" data-cn="' + esc(o.cn) + '"></svg><div class="cn">' + esc(o.cn) + '</div></div>' +
+      '<div class="foot"><span>Order ' + esc(o.id) + '</span><span>Stay Fit. Stay Confident.</span></div>' +
+      '</div></div>';
+  }).join('');
+  if (window.JsBarcode) {
+    wrap.querySelectorAll('svg.barcode').forEach(function(svg){
+      try { JsBarcode(svg, svg.getAttribute('data-cn'), { format: 'CODE128', width: 2, height: 60, fontSize: 0, margin: 0, displayValue: false }); }
+      catch (e) { svg.outerHTML = '<div style="font-size:18px;font-weight:800">' + esc(svg.getAttribute('data-cn')) + '</div>'; }
+    });
+  } else {
+    wrap.querySelectorAll('svg.barcode').forEach(function(svg){
+      svg.outerHTML = '<div style="font-size:15px;font-weight:800">BARCODE NAHI BANA — internet chahiye</div>';
+    });
+  }
+}
+function setSource(mode){
+  var el = document.getElementById('srcLine');
+  if (mode === 'live') { el.textContent = '● LIVE — sheet se abhi load hua'; el.className = 'src'; }
+  else { el.textContent = '● SNAPSHOT — ' + SNAPSHOT_TIME + ' ka data (live ke liye app wala Labels use karo)'; el.className = 'src snap'; }
+}
+function boot(){
+  var started = loadLive(function(list, mode){
+    if (list) { ORDERS = list; setSource('live'); }
+    else { ORDERS = SNAPSHOT_ORDERS.map(norm).filter(isReal); setSource('snap'); }
+    SELECTED = {}; render();
+  });
+  if (!started) { ORDERS = SNAPSHOT_ORDERS.map(norm).filter(isReal); setSource('snap'); SELECTED = {}; render(); }
+  document.getElementById('btnAll').addEventListener('click', function(){
+    ORDERS.forEach(function(o){ SELECTED[o.id] = true; }); render();
+  });
+  document.getElementById('btnNone').addEventListener('click', function(){
+    ORDERS.forEach(function(o){ SELECTED[o.id] = false; }); render();
+  });
+  document.getElementById('btnRefresh').addEventListener('click', function(){ boot(); });
+  document.getElementById('btnPrint').addEventListener('click', function(){ window.print(); });
+}
+boot();
+</script>
+</body>
+</html>
