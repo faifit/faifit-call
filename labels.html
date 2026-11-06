@@ -165,9 +165,13 @@ function render(){
   else ln.innerHTML = nocn.map(function(o){
     var btn = '';
     if (o.status === 'Ready to Dispatch') {
-      btn = IS_GAS
-        ? '<br><button class="btn btn-gold btn-sm bookBtn" data-id="' + esc(o.id) + '">📦 Book karo — Leopards</button>'
-        : '<br><span style="color:#ff9f43">Booking sirf app se hoti hai — GitHub page se nahi.</span>';
+      if (o.courier === 'Leopards') {
+        btn = IS_GAS
+          ? '<br><button class="btn btn-gold btn-sm bookBtn" data-id="' + esc(o.id) + '">📦 Book karo — Leopards</button>'
+          : '<br><span style="color:#ff9f43">Booking sirf app se hoti hai — GitHub page se nahi.</span>';
+      } else {
+        btn = '<br><span style="color:#ff9f43">' + esc(o.courier || 'Courier') + ' ki booking us ke portal se hoti hai — CN aa kar label ban jayega.</span>';
+      }
     }
     return '<div class="pick nocn"><span><span class="nm">' + esc(o.customer) + ' — ' + esc(o.id) + '</span>' +
       '<span class="mut"><br>' + esc(o.city) + ' · ' + esc(o.product || '—') +
